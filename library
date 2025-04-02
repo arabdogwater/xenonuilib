@@ -85,7 +85,7 @@ end)
 end
 end
 
-function library.Create(title, titleUnder)
+function library:Create(title, titleUnder)
 local lib = {}
 
 lib.UI = game:GetObjects("rbxassetid://6849423853")[1]
