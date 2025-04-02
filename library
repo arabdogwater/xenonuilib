@@ -1,925 +1,507 @@
-local library = {}
+local XenonUI = {}
+XenonUI.__index = XenonUI
 
--- Add a proper metatable setup for the library
-local libraryMetatable = {
-    __index = function(self, key)
-        return library[key]
+-- Services
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
+-- Constants
+local CORNER_RADIUS = 8
+local ANIMATION_SPEED = 0.2
+local COLORS = {
+    Background = Color3.fromRGB(25, 25, 25),
+    Secondary = Color3.fromRGB(35, 35, 35),
+    Accent = Color3.fromRGB(0, 120, 215),
+    Text = Color3.fromRGB(255, 255, 255),
+    SubText = Color3.fromRGB(200, 200, 200),
+    Border = Color3.fromRGB(45, 45, 45),
+    Hover = Color3.fromRGB(40, 40, 40),
+    Pressed = Color3.fromRGB(30, 30, 30)
+}
+
+-- Utility Functions
+local function CreateCorner()
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, CORNER_RADIUS)
+    return corner
+end
+
+local function CreateStroke()
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = COLORS.Border
+    stroke.Thickness = 1
+    return stroke
+end
+
+local function TweenObject(object, properties, duration)
+    local tweenInfo = TweenInfo.new(duration or ANIMATION_SPEED, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    return TweenService:Create(object, tweenInfo, properties)
+end
+
+-- Main Window Creation
+function XenonUI.new(title, subtitle)
+    local self = setmetatable({}, XenonUI)
+    
+    -- Create main window
+    self.window = Instance.new("ScreenGui")
+    self.window.Name = "XenonUI"
+    self.window.ResetOnSpawn = false
+    
+    -- Main frame
+    self.mainFrame = Instance.new("Frame")
+    self.mainFrame.Name = "MainFrame"
+    self.mainFrame.Size = UDim2.new(0, 400, 0, 500)
+    self.mainFrame.Position = UDim2.new(0.5, -200, 0.5, -250)
+    self.mainFrame.BackgroundColor3 = COLORS.Background
+    self.mainFrame.BorderSizePixel = 0
+    self.mainFrame.Parent = self.window
+    
+    -- Add corner and stroke
+    CreateCorner().Parent = self.mainFrame
+    CreateStroke().Parent = self.mainFrame
+    
+    -- Title bar
+    self.titleBar = Instance.new("Frame")
+    self.titleBar.Name = "TitleBar"
+    self.titleBar.Size = UDim2.new(1, 0, 0, 40)
+    self.titleBar.BackgroundColor3 = COLORS.Secondary
+    self.titleBar.BorderSizePixel = 0
+    self.titleBar.Parent = self.mainFrame
+    
+    CreateCorner().Parent = self.titleBar
+    
+    -- Title text
+    self.titleText = Instance.new("TextLabel")
+    self.titleText.Name = "Title"
+    self.titleText.Size = UDim2.new(1, -80, 1, 0)
+    self.titleText.Position = UDim2.new(0, 10, 0, 0)
+    self.titleText.BackgroundTransparency = 1
+    self.titleText.Text = title
+    self.titleText.TextColor3 = COLORS.Text
+    self.titleText.TextSize = 16
+    self.titleText.Font = Enum.Font.GothamBold
+    self.titleText.TextXAlignment = Enum.TextXAlignment.Left
+    self.titleText.Parent = self.titleBar
+    
+    -- Subtitle text
+    self.subtitleText = Instance.new("TextLabel")
+    self.subtitleText.Name = "Subtitle"
+    self.subtitleText.Size = UDim2.new(1, -80, 1, 0)
+    self.subtitleText.Position = UDim2.new(0, 10, 0, 0)
+    self.subtitleText.BackgroundTransparency = 1
+    self.subtitleText.Text = subtitle
+    self.subtitleText.TextColor3 = COLORS.SubText
+    self.subtitleText.TextSize = 12
+    self.subtitleText.Font = Enum.Font.Gotham
+    self.subtitleText.TextXAlignment = Enum.TextXAlignment.Left
+    self.subtitleText.Parent = self.titleBar
+    
+    -- Close button
+    self.closeButton = Instance.new("TextButton")
+    self.closeButton.Name = "CloseButton"
+    self.closeButton.Size = UDim2.new(0, 30, 1, 0)
+    self.closeButton.Position = UDim2.new(1, -40, 0, 0)
+    self.closeButton.BackgroundColor3 = COLORS.Secondary
+    self.closeButton.BorderSizePixel = 0
+    self.closeButton.Text = "×"
+    self.closeButton.TextColor3 = COLORS.Text
+    self.closeButton.TextSize = 20
+    self.closeButton.Font = Enum.Font.GothamBold
+    self.closeButton.Parent = self.titleBar
+    
+    CreateCorner().Parent = self.closeButton
+    
+    -- Content area
+    self.content = Instance.new("ScrollingFrame")
+    self.content.Name = "Content"
+    self.content.Size = UDim2.new(1, -20, 1, -60)
+    self.content.Position = UDim2.new(0, 10, 0, 50)
+    self.content.BackgroundTransparency = 1
+    self.content.ScrollBarThickness = 4
+    self.content.Parent = self.mainFrame
+    
+    -- Layout
+    self.layout = Instance.new("UIListLayout")
+    self.layout.Name = "Layout"
+    self.layout.Padding = UDim.new(0, 5)
+    self.layout.Parent = self.content
+    
+    -- Initialize
+    self.tabs = {}
+    self.currentTab = nil
+    self.elements = {}
+    
+    -- Add close button functionality
+    self.closeButton.MouseButton1Click:Connect(function()
+        self:Close()
+    end)
+    
+    -- Add dragging functionality
+    local dragging
+    local dragInput
+    local dragStart
+    local startPos
+    
+    local function update(input)
+        local delta = input.Position - dragStart
+        self.mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
     end
-}
-
-setmetatable(library, libraryMetatable)
-
-function library:Tween(asset, info, thing)
-game:GetService("TweenService"):Create(asset, info, thing):Play()
-end
-
-function library:DropInfo(asset, info, tbl)
-if not tbl.debounce then
-tbl.debounce = true
-
-local newText = asset:FindFirstChild("Text"):Clone()
-newText.Parent = asset
-newText.Name = "Info"
-newText.TextTransparency = 1
-newText.TextSize = 24
-newText.Position = UDim2.new(asset:FindFirstChild("Text").Position.X.Scale, asset:FindFirstChild("Text").Position.X.Offset, ((asset:FindFirstChild("Text").Position.Y.Scale / 2) * 3), asset:FindFirstChild("Text").Position.Y.Offset)
-newText.Text = info
-
-local textAsset = asset:FindFirstChild("Text")
-
-library:Tween(asset, TweenInfo.new(0.5), {Size = UDim2.new(asset.Size.X.Scale, asset.Size.X.Offset, (asset.Size.Y.Scale * 2), asset.Size.Y.Offset)})
-library:Tween(textAsset, TweenInfo.new(0.5), {Position = UDim2.new(textAsset.Position.X.Scale, textAsset.Position.X.Offset, (textAsset.Position.Y.Scale / 2), textAsset.Position.Y.Offset), Size = UDim2.new(textAsset.Size.X.Scale, textAsset.Size.X.Offset, (textAsset.Size.Y.Scale / 2), textAsset.Size.Y.Offset)})
-library:Tween(asset["Down"], TweenInfo.new(0.3), {Rotation = 180, Position = UDim2.new(asset["Down"].Position.X.Scale, asset["Down"].Position.X.Offset, (asset["Down"].Position.Y.Scale / 2), asset["Down"].Position.Y.Offset)})
-wait(0.5)
-
-library:Tween(newText, TweenInfo.new(0.5), {TextTransparency = 0})
-
-wait(0.5)
-
-tbl.debounce = false
-tbl.showingInfo = true
-end
-end
-
-function library:RetractInfo(asset, tbl)
-if not tbl.debounce then
-tbl.debounce = true
-library:Tween(asset["Info"], TweenInfo.new(0.25), {TextTransparency = 1})
-library:Tween(asset["Down"], TweenInfo.new(0.3), {Rotation = 0, Position = UDim2.new(asset["Down"].Position.X.Scale, asset["Down"].Position.X.Offset, (asset["Down"].Position.Y.Scale * 2), asset["Down"].Position.Y.Offset)})
-library:Tween(asset, TweenInfo.new(0.5), {Size = UDim2.new(asset.Size.X.Scale, asset.Size.X.Offset, (asset.Size.Y.Scale / 2), asset.Size.Y.Offset)})
-
-local textAsset = asset:FindFirstChild("Text")
-library:Tween(textAsset, TweenInfo.new(0.5), {Position = UDim2.new(textAsset.Position.X.Scale, textAsset.Position.X.Offset, (textAsset.Position.Y.Scale * 2), textAsset.Position.Y.Offset), Size = UDim2.new(textAsset.Size.X.Scale, textAsset.Size.X.Offset, (textAsset.Size.Y.Scale * 2), textAsset.Size.Y.Offset)})
-
-wait(0.5)
-asset["Info"]:Destroy()
-tbl.debounce = false
-tbl.showingInfo = false
-end
-end
-
-function library:RoundNumber(num, numDecimalPlaces)
-return tonumber(string.format("%." .. (numDecimalPlaces or 0) .. "f", num))
-end
-
-function library:Ripple(ui, button, x, y, tbl)
-if x and y then
-spawn(function()
-local c = ui.Circle:Clone()
-c.Parent = button;
-
-c.ImageTransparency = 0.6
-
-local x, y = (x-button.AbsolutePosition.X), (y-button.AbsolutePosition.Y-36)
-c.Position = UDim2.new(0, x, 0, y)
-local len, size = 0.75, nil
-if button.AbsoluteSize.X >= button.AbsoluteSize.Y then
-size = (button.AbsoluteSize.X * 1.5)
-else
-size = (button.AbsoluteSize.Y * 1.5)
-end
-local tween = {}
-tween.Size = UDim2.new(0, size, 0, size)
-tween.Position = UDim2.new(0.5, (-size / 2), 0.5, (-size / 2))
-tween.ImageTransparency = 1
-
-local newTween = game:GetService("TweenService"):Create(c, TweenInfo.new(len, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), tween)
-
-newTween:Play()
-
-newTween.Completed:Wait()
-
-c:Destroy()
-end)
-end
-end
-
-function library:Create(title, titleUnder)
-local lib = {}
-setmetatable(lib, libraryMetatable)  -- Ensure the new lib has the same metatable
-
-lib.UI = game:GetObjects("rbxassetid://6849423853")[1]
-lib.UI.Parent = game.CoreGui
-
-lib.Tabs = {}
-
-lib.UI.Main.Left.UIName.Text = title
-lib.UI.Main.Left.GameName.Text = titleUnder
-
-local content,isReady;
-
-spawn(function()
-content, isReady = game.Players:GetUserThumbnailAsync(game.Players.LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48)
-
-repeat wait() until content and isReady
-
-
-end)
-
-
-
-
-lib.Notifications = {}
-lib.Notifications.Queue = {}
-lib.Notifications.Current = nil
-
-local MainFrame = lib.UI.Main
-
---Dragging
-local dragging
-local dragInput
-local dragStart
-local startPos
-
-local function update(input)
-local delta = input.Position - dragStart
-game:GetService("TweenService"):Create(MainFrame, TweenInfo.new(0.1), {Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)}):Play()
-end
-
-MainFrame.InputBegan:Connect(function(input)
-if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-dragging = true
-dragStart = input.Position
-startPos = MainFrame.Position
-
-input.Changed:Connect(function()
-if input.UserInputState == Enum.UserInputState.End then
-dragging = false
-end
-end)
-end
-end)
-
-MainFrame.InputChanged:Connect(function(input)
-if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-dragInput = input
-end
-end)
-
-game:GetService("UserInputService").InputChanged:Connect(function(input)
-if input == dragInput and dragging then
-update(input)
-end
-end)
-
-return setmetatable(lib, library)
-end
-
-function library:Tab(name, imageId)
-local tab = {}
-
-tab.Assets = {}
-
-tab.Lib = self
-tab.Tab = self.UI.Main.Left.Container.Template:Clone()
-tab.Tab.Name = name
-tab.Tab.TabName.Text = name
-tab.Tab.Parent = self.UI.Main.Left.Container
-
-if imageId then
-tab.Tab.TabIcon.Image = "rbxassetid://" .. imageId
-end
-
-table.insert(self.Tabs, tab)
-
-tab.Show = function()
-tab.Tab.Visible = true
-end
-
-tab.Hide = function()
-tab.Tab.Visible = false
-end
-
-tab.Fix = function()
-self.UI.Main.Container.AutomaticCanvasSize = Enum.AutomaticSize.None
-self.UI.Main.Container.AutomaticCanvasSize = Enum.AutomaticSize.Y
-end
-
-local totalAssets = 0
-for i,v in pairs(self.Tabs) do
-totalAssets = totalAssets + 1
-end
-
-if totalAssets == 1 then
--- first tab
-delay(0.1, function()
-for i,v in pairs(tab.Assets) do
-if v then
-v.Show()
-end
-end
-library:Tween(tab.Tab, TweenInfo.new(0.5), {BackgroundTransparency = 0})
-end)
-end
-
-tab.Fix()
-
-tab.Tab.MouseButton1Down:Connect(function()
-for i,v in pairs(self.Tabs) do
-library:Tween(v.Tab, TweenInfo.new(0.5), {BackgroundTransparency = 1})
-for i,v in pairs(v.Assets) do
-v.Hide()
-end
-end
-
-for i,v in pairs(tab.Assets) do
-v.Show()
-end
-tab.Fix()
-library:Tween(tab.Tab, TweenInfo.new(0.5), {BackgroundTransparency = 0})
-end)
-
-tab.Show()
-
-return setmetatable(tab, library)
-end
-
-function library:Button(text, info, callback)
-local button = {}
-
-button.callback = callback or function() end
-button.debounce = false
-button.showingInfo = false
-button.button = self.Lib.UI.Main.Container.Button:Clone()
-button.button.Parent = self.Lib.UI.Main.Container
-button.button:FindFirstChild("Text").Text = (text or "No Text")
-button.button.Name = (text or "No Text")
-
-button.Show = function()
-button.button.Visible = true
-end
-
-button.Hide = function()
-button.button.Visible = false
-end
-
-button.Click = function(x, y)
-if not button.debounce then
-if not x or not y then
-x = (button.button.AbsolutePosition.X/2)
-y = (button.button.AbsolutePosition.Y/2)
-end
-library:Ripple(self.Lib.UI, button.button, x, y, button)
-button.callback()
-end
-end
-
-button.button.Down.MouseButton1Down:Connect(function()
-if not button.showingInfo then
-library:DropInfo(button.button, info, button)
-else
-library:RetractInfo(button.button, button)
-end
-end)
-
-button.button.MouseButton1Down:Connect(function(x,y)
-button.Click(x, y)
-end)
-
-table.insert(self.Assets, button)
-
-return setmetatable(button, library)
-end
-
-function library:Toggle(text, info, state, callback, dont_run_on_start)
-local toggle = {}
-
-toggle.callback = callback or function() end
-toggle.debounce = false
-toggle.showingInfo = false
-toggle.state = state
-toggle.toggle = self.Lib.UI.Main.Container.Toggle:Clone()
-toggle.toggle.Parent = self.Lib.UI.Main.Container
-toggle.toggle:FindFirstChild("Text").Text = (text or "No Text")
-toggle.toggle.Name = (text or "No Text")
-
-toggle.Show = function()
-toggle.toggle.Visible = true
-end
-
-toggle.Hide = function()
-toggle.toggle.Visible = false
-end
-
-toggle.Refresh = function()
-if toggle.state then
-toggle.state = false
-toggle.debounce = true
-spawn(function()
-toggle.callback(toggle.state)
-end)
-local circle = toggle.toggle.Whole.Inner
-local newPosition = UDim2.new((circle.Position.X.Scale / 3), circle.Position.X.Offset, circle.Position.Y.Scale, circle.Position.Y.Offset)
-
-library:Tween(circle, TweenInfo.new(0.2), {Position = newPosition})
-library:Tween(circle.Parent, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(213, 213, 213)})
-
-wait(0.3)
-toggle.debounce = false
-else
-toggle.state = true
-toggle.debounce = true
-spawn(function()
-toggle.callback(toggle.state)
-end)
-local circle = toggle.toggle.Whole.Inner
-local newPosition = UDim2.new((circle.Position.X.Scale * 3), circle.Position.X.Offset, circle.Position.Y.Scale, circle.Position.Y.Offset)
-
-library:Tween(circle, TweenInfo.new(0.2), {Position = newPosition})
-library:Tween(circle.Parent, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(248, 86, 86)})
-
-wait(0.3)
-toggle.debounce = false
-end
-end
-
-spawn(function()
-if toggle.state then
-toggle.debounce = true
-local circle = toggle.toggle.Whole.Inner
-local newPosition = UDim2.new((circle.Position.X.Scale * 3), circle.Position.X.Offset, circle.Position.Y.Scale, circle.Position.Y.Offset)
-
-library:Tween(circle, TweenInfo.new(0.2), {Position = newPosition})
-library:Tween(circle.Parent, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(248, 86, 86)})
-
-wait(0.3)
-toggle.debounce = false
-end
-end)
-
-toggle.toggle.Down.MouseButton1Down:Connect(function()
-if not toggle.showingInfo then
-library:DropInfo(toggle.toggle, info, toggle)
-else
-library:RetractInfo(toggle.toggle, toggle)
-end
-end)
-
-toggle.toggle.MouseButton1Down:Connect(function(x,y)
-if not toggle.debounce then
-library:Ripple(self.Lib.UI, toggle.toggle, x, y, toggle)
-toggle.Refresh()
-end
-end)
-
-if not dont_run_on_start then
-local ran, failed = pcall(function()
-toggle.callback(toggle.state)
-end)
-
-if ran then
-print("Ran sucessfully.")
-else
-print("Failed to run but no worries!", failed)
-end
-end
-
-table.insert(self.Assets, toggle)
-return setmetatable(toggle, library)
-end
-
-function library:Seperator()
-local seperator = {}
-
-seperator.asset = self.Lib.UI.Main.Container.Seperator:Clone()
-seperator.asset.Parent = self.Lib.UI.Main.Container
-
-seperator.Show = function()
-seperator.asset.Visible = true
-end
-
-seperator.Hide = function()
-seperator.asset.Visible = false
-end
-
-table.insert(self.Assets, seperator)
-return setmetatable(seperator, library)
-end
-
-function library:Slider(name, min, max, starting, callback)
-local slider = {}
-
-slider.callback = callback or function() end
-slider.min = min or 1
-slider.max = max or 100
-
-slider.asset = self.Lib.UI.Main.Container.Slider:Clone()
-slider.asset.Name = (name or "None")
-slider.asset:FindFirstChild("Slider").Text = (name or "None")
-slider.asset.Parent = self.Lib.UI.Main.Container
-slider.holdAsset = self.Lib.UI.Main.Container
-
-slider.dragging = false
-
-slider.holdAsset = slider.asset.Holder.Holder.Circle
-
-local mouse = game.Players.LocalPlayer:GetMouse()
-local uis = game:GetService("UserInputService")
-local Value;
-
-local bound = slider.holdAsset.Parent.Parent.AbsoluteSize.X
-
-local IsDecimal = select(2, math.modf(starting)) ~= 0
-
-local function move(input)
-
-local pos1 =
-UDim2.new(
-math.clamp((input.Position.X - slider.holdAsset.Parent.AbsolutePosition.X) / bound, 0, 1),
-0,
-1,
-0
-)
-slider.holdAsset.Parent:TweenSize(pos1, "Out", "Sine", 0.1, true)
-local value = (IsDecimal and library:RoundNumber((((pos1.X.Scale * slider.max) / slider.max) * (slider.max - slider.min) + slider.min), 1) or math.floor((((pos1.X.Scale * slider.max) / slider.max) * (slider.max - slider.min) + slider.min)))
-slider.asset.Percentage.Text = tostring(value)
-pcall(slider.callback, value)
-end
-
-slider.holdAsset.InputBegan:Connect(
-function(input)
-if input.UserInputType == Enum.UserInputType.MouseButton1 then
-slider.dragging = true
-end
-end
-)
-slider.holdAsset.InputEnded:Connect(
-function(input)
-if input.UserInputType == Enum.UserInputType.MouseButton1 then
-slider.dragging = false
-end
-end
-)
-
-game:GetService("UserInputService").InputChanged:Connect(
-function(input)
-if slider.dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-move(input)
-end
-end
-)
-
-slider.Refresh = function(new, bool)
-
-slider.holdAsset.Parent:TweenSize(UDim2.new((new or 0) / slider.max, 0, 1, 0), "Out", "Sine", 0.1, true)
-slider.asset.Percentage.Text = tostring(new and (IsDecimal and library:RoundNumber(((new / slider.max) * (slider.max - slider.min) + slider.min), 1) or math.floor((new / slider.max) * (slider.max - slider.min) + slider.min) or 0))
-pcall(slider.callback, new)
-end
-
-   slider.Refresh(starting)
-
-slider.Show = function()
-slider.asset.Visible = true
-end
-
-slider.Hide = function()
-slider.asset.Visible = false
-end
-
-table.insert(self.Assets, slider)
-return setmetatable(slider, library)
-end
-
-function library:Dropdown(name, list, callback)
-local dropdown = {}
-
-dropdown.table = list
-dropdown.callback = callback or function() end
-
-dropdown.debounce = false
-
-dropdown.asset = self.Lib.UI.Main.Container.Dropdown:Clone()
-dropdown.asset.Parent = self.Lib.UI.Main.Container
-
-dropdown.assets = {}
-dropdown.connections = {}
-
-dropdown.asset:FindFirstChild("Text").Text = dropdown.table[1]
-
-function dropdown.Refresh()
-if not table.find(dropdown.table, dropdown.asset:FindFirstChild("Text").Text) then
-dropdown.asset:FindFirstChild("Text").Text = dropdown.table[1]
-end
-end
-
-dropdown.showing = false
-
-dropdown.asset.MouseButton1Down:Connect(function(x, y)
-if not dropdown.debounce then
-library:Ripple(self.Lib.UI, dropdown.asset, x, y, {["showingInfo"] = false})
-if #dropdown.assets < 1 then
-dropdown.debounce = true
-local passed = false
-local num = 0
-local assets = {}
-for i,v in ipairs(dropdown.asset.Parent:GetChildren()) do
-if v.ClassName ~= "Folder" and v.ClassName ~= "UIListLayout" and v.ClassName ~= "UIAspectRatioConstraint"  and v.Visible and not passed and v == dropdown.asset then
-passed = true
-end
-
-if passed then
-if v ~= dropdown.asset then
-num = num + 1
-v.Parent = v.Parent.Hold
-table.insert(assets, v)
-end
-end
-end
-
-library:Tween(dropdown.asset["Down"], TweenInfo.new(0.3), {Rotation = 180})
-
-for i = 1, #dropdown.table do
-local newDrop = self.Lib.UI.Main.Container.DropdownDrop:Clone()
-newDrop.Parent = self.Lib.UI.Main.Container
-
-
-newDrop:FindFirstChild("Text").Text = dropdown.table[i]
-
-newDrop.Visible = true
-library:Tween(newDrop, TweenInfo.new(0.2), {BackgroundTransparency = 0})
-library:Tween(newDrop:FindFirstChild("Text"), TweenInfo.new(0.3), {TextTransparency = 0})
-
-local thing = {}
-
-thing.Asset = newDrop
-
-thing.Show = function()
-dropdown.assets[i].Visible = true
-end
-
-thing.Hide = function()
-dropdown.assets[i].Visible = false
-end
-
-table.insert(dropdown.assets, newDrop)
-table.insert(self.Assets, thing)
-
-local con;
-
-con = thing.Asset.MouseButton1Down:Connect(function(x, y)
-if dropdown.showing then
-table.insert(dropdown.connections, con)
-dropdown.debounce = true
-library:Tween(dropdown.asset["Down"], TweenInfo.new(0.3), {Rotation = 0})
-
-if dropdown.asset:FindFirstChild("Text").Text ~= dropdown.table[i] then
-dropdown.asset:FindFirstChild("Text").Text = dropdown.table[i]
-dropdown.callback(dropdown.table[i])
-end
-
-for i,v in pairs(dropdown.connections) do
-v:Disconnect()
-table.remove(dropdown.connections, i)
-end
-
-for i = #dropdown.assets, 1, -1 do
-library:Tween(dropdown.assets[i], TweenInfo.new(0.2), {BackgroundTransparency = 1})
-library:Tween(dropdown.assets[i]:FindFirstChild("Text"), TweenInfo.new(0.3), {TextTransparency = 1})
-
-game:GetService("RunService").RenderStepped:Wait()
-
-dropdown.assets[i]:Destroy()
-
-for a,v in pairs(self.Assets) do
-if v.Asset == dropdown.assets[i] then
-table.remove(self.Assets, a)
-end
-end
-table.remove(dropdown.assets, i)
-end
-
-dropdown.debounce = false
-end
-end)
-
-game:GetService("RunService").RenderStepped:Wait()
-end
-
-for i,v in ipairs(assets) do
-v.Parent = v.Parent.Parent
-end
-
-for i,v in pairs(assets) do
-table.remove(assets, i)
-end
-
-dropdown.showing = true
-dropdown.debounce = false
-else
-dropdown.debounce = true
-library:Tween(dropdown.asset["Down"], TweenInfo.new(0.3), {Rotation = 0})
-for i = #dropdown.assets, 1, -1 do
-library:Tween(dropdown.assets[i], TweenInfo.new(0.2), {BackgroundTransparency = 1})
-library:Tween(dropdown.assets[i]:FindFirstChild("Text"), TweenInfo.new(0.3), {TextTransparency = 1})
-
-game:GetService("RunService").RenderStepped:Wait()
-
-dropdown.assets[i]:Destroy()
-
-for a,v in pairs(self.Assets) do
-if v.Asset == dropdown.assets[i] then
-table.remove(self.Assets, a)
-end
-end
-table.remove(dropdown.assets, i)
-end
-dropdown.showing = false
-dropdown.debounce = false
-end
-end
-end)
-
-dropdown.Hide = function()
-dropdown.asset.Visible = false
-end
-
-dropdown.Show = function()
-dropdown.asset.Visible = true
-end
-
-table.insert(self.Assets, dropdown)
-return setmetatable(dropdown, library)
-end
-
-function library:Label(text)
-local label = {}
-
-label.asset = self.Lib.UI.Main.Container.Label:Clone()
-label.asset.Parent = self.Lib.UI.Main.Container
-
-label.class = "label"
-
-function label.Refresh(newText)
-label.asset:FindFirstChild("Text").Text = newText
-end
-
-label.Refresh(text)
-
-label.Show = function()
-label.asset.Visible = true
-end
-
-label.Hide = function()
-label.asset.Visible = false
-end
-
-table.insert(self.Assets, label)
-return setmetatable(label, library)
-end
-
-function library:TextBox(text, callback)
-local textbox = {}
-
-textbox.Name = text
-textbox.callback = callback or function() end
-textbox.class = "textbox"
-textbox.debounce = false
-
-textbox.asset = self.Lib.UI.Main.Container.TextBox:Clone()
-textbox.asset.Parent = self.Lib.UI.Main.Container
-textbox.asset:FindFirstChild("Text").Text = text
-
-textbox.typing = false
-
-textbox.connections = {}
-
-textbox.asset.Outline.Box.Focused:Connect(function()
-if not textbox.typing then
-textbox.asset.Outline.Box:ReleaseFocus()
-end
-end)
-
-textbox.asset.MouseButton1Down:Connect(function(x,y)
-if not textbox.debounce then
-textbox.debounce = true
-textbox.typing = true
-library:Ripple(self.Lib.UI, textbox.asset, x, y, textbox)
-library:Tween(textbox.asset.Outline, TweenInfo.new(0.35, Enum.EasingStyle.Quart), {
-Size = UDim2.new((textbox.asset.Outline.Size.X.Scale + 0.225), textbox.asset.Outline.Size.X.Offset, textbox.asset.Outline.Size.Y.Scale, textbox.asset.Outline.Size.Y.Offset),
-Position = UDim2.new((textbox.asset.Outline.Position.X.Scale - 0.1125), textbox.asset.Outline.Position.X.Offset, textbox.asset.Outline.Position.Y.Scale, textbox.asset.Outline.Position.Y.Offset)
-})
-wait(0.35)
-textbox.asset.Outline.Box:CaptureFocus()
-textbox.asset.Outline.Box.FocusLost:Wait()
-textbox.typing = false
-library:Tween(textbox.asset.Outline, TweenInfo.new(0.35, Enum.EasingStyle.Quart), {
-Size = UDim2.new((textbox.asset.Outline.Size.X.Scale - 0.225), textbox.asset.Outline.Size.X.Offset, textbox.asset.Outline.Size.Y.Scale, textbox.asset.Outline.Size.Y.Offset),
-Position = UDim2.new((textbox.asset.Outline.Position.X.Scale + 0.1125), textbox.asset.Outline.Position.X.Offset, textbox.asset.Outline.Position.Y.Scale, textbox.asset.Outline.Position.Y.Offset),
-})
-
-textbox.callback(textbox.asset.Outline.Box.Text)
-
-wait(0.35)
-
-textbox.debounce = false
-end
-end)
-
-textbox.Show = function()
-textbox.asset.Visible = true
-end
-
-textbox.Hide = function()
-textbox.asset.Visible = false
-end
-
-table.insert(self.Assets, textbox)
-return setmetatable(textbox, library)
-end
-
-function library:Keybind(name, key, blacklist, callback)
-   local keybind = {}
-
-   if (#blacklist) == 0 then
-       blacklist = nil
-   end
-
-   keybind.key_blacklist = blacklist or {"W", "A", "S", "D"}
-
-   keybind.ValidKey = function(key)
-       return (typeof(key) == "EnumItem")
-   end
-
-   keybind.GetKeystringFromEnum = function(key)
-       key = tostring(key)
-       return ( string.sub( key,  14, #key ) )
-   end
-
-   keybind.IsNotMouse = function(key)
-       return (key.UserInputType == Enum.UserInputType.MouseButton1 or key.UserInputType == Enum.UserInputType.MouseButton2)
-   end
-
-   keybind.callback = callback or function() end
-keybind.asset = self.Lib.UI.Main.Container.Keybind:Clone()
-keybind.asset.Parent = self.Lib.UI.Main.Container
-
-   keybind.class = "keybind"
-keybind.debounce = false
-
-   keybind.key = (keybind.ValidKey(key) and key) or Enum.KeyCode.E --// default key
-
-   keybind.asset:FindFirstChild("Text").Text = name
-   keybind.asset:FindFirstChild("RoundHolder").TextLabel.Text = keybind.GetKeystringFromEnum(keybind.key)
-
-   keybind.in_change = false
-   keybind.change_conn = nil
-
-   keybind.KeyPress = game:GetService("UserInputService").InputBegan:Connect(function(input, gpe)
-       if gpe then return end
-
-       if input.KeyCode == keybind.key and not keybind.in_change then
-           pcall(keybind.callback)
-       end
-   end)
-
-keybind.asset.MouseButton1Down:Connect(function(x,y)
-       if not keybind.debounce then
-           keybind.debounce = true
-           keybind.in_change = true
-           library:Ripple(self.Lib.UI, keybind.asset, x, y, keybind)
-
-           local contin = false
-
-           local cache = {}
-           cache.OldText = keybind.asset:FindFirstChild("Text").Text
-           cache.OldKey = keybind.asset:FindFirstChild("RoundHolder").TextLabel.Text
-
-           keybind.asset:FindFirstChild("Text").Text = (cache.OldText .. " [press enter to cancel]")
-           keybind.asset:FindFirstChild("RoundHolder").TextLabel.Text = "..."
-
-           keybind.change_conn = game:GetService("UserInputService").InputBegan:Connect(function(input, gpe)
-               if gpe then return end
-
-               if keybind.IsNotMouse(input) then return end
-
-               if input.KeyCode == Enum.KeyCode.Return then
-                   contin = true
-                   keybind.asset:FindFirstChild("RoundHolder").TextLabel.Text = cache.OldKey
-                   keybind.change_conn:Disconnect()
-                   return  
-               end
-
-               if not table.find(keybind.key_blacklist, keybind.GetKeystringFromEnum(input.KeyCode)) then
-                   keybind.key = input.KeyCode
-                   keybind.asset:FindFirstChild("RoundHolder").TextLabel.Text = keybind.GetKeystringFromEnum(keybind.key)
-                   contin = true
-
-                   pcall(keybind.callback, keybind.GetKeystringFromEnum(keybind.key))
-
-                   keybind.change_conn:Disconnect()
-               end
-           end)
-
-           repeat wait() until contin
-
-           keybind.asset:FindFirstChild("Text").Text = cache.OldText
-           cache = nil
-           keybind.in_change = false
-
-           wait(0.5)
-           keybind.debounce = false
-       end
-   end)
-
-   keybind.Show = function()
-       keybind.asset.Visible = true
-   end
-
-   keybind.Hide = function()
-       keybind.asset.Visible = false
-   end
-
-   table.insert(self.Assets, keybind)
-   return setmetatable(keybind, library)
-end
-
-function library:Notification(text)
-local notification = {}
-notification.NotifText = text
-notification.Bind = nil
-table.insert(self.Lib.Notifications.Queue, notification)
-
-spawn(function()
-
-for notif = 1, #self.Lib.Notifications.Queue do
-repeat wait() until not self.Lib.Notifications.Current
-self.Lib.Notifications.Current = self.Lib.Notifications.Queue[notif]
-
-local Cover = self.Lib.UI.Main.BackgroundCover
-Cover.Visible = true
-
-Cover.Notification.NotificationLabel.Text = (self.Lib.Notifications.Queue[notif].NotifText or "No text provided")
-
-local TweenData = {
-Transparency = 0.5
-}
-
-local CoverTween = game:GetService("TweenService"):Create(Cover, TweenInfo.new(0.5), TweenData)
-CoverTween:Play()
-CoverTween.Completed:Wait()
-
-local TweenData2 = {
-Position = UDim2.new(0.5, 0, 0.7, 0)
-}
-
-local NotifTween = game:GetService("TweenService"):Create(Cover.Notification, TweenInfo.new(0.5), TweenData2)
-NotifTween:Play()
-NotifTween.Completed:Wait()
-
-self.Lib.Notifications.Queue[notif].Bind = Cover.Notification.Ok.MouseButton1Click:Connect(function()
-local TweenData3 = {
-Position = UDim2.new(0.5, 0, 1, 0)
-}
-
-local NotifTween2 = game:GetService("TweenService"):Create(Cover.Notification, TweenInfo.new(0.5), TweenData3)
-NotifTween2:Play()
-NotifTween2.Completed:Wait()
-
-local TweenData4 = {
-Transparency = 1
-}
-
-local CoverTween2 = game:GetService("TweenService"):Create(Cover, TweenInfo.new(0.5), TweenData4)
-CoverTween2:Play()
-CoverTween2.Completed:Wait()
-Cover.Visible = false
-
-self.Lib.Notifications.Queue[notif].Bind:Disconnect()
-table.remove(self.Lib.Notifications.Queue, notif)
-
-self.Lib.Notifications.Current = nil
-end)
-end
-
-end)
-end
-
-function library:Click()
-    -- Remove the recursive call
-end
-
-function library:Update(new, new2, new3)
-    if self.table then
-        self.table = new
-        self.Refresh()
-    elseif self.min and self.max then
-        self.min = new
-        self.max = new2
-        self.Refresh(new3 or self.max/2, true)
-    elseif self.toggle then
-        if new ~= self.state then
-            self.state = new
-            self.Refresh()
+    
+    self.titleBar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = self.mainFrame.Position
         end
-    elseif self.class == "label" then
-        self.Refresh(new)
-    end
+    end)
+    
+    self.titleBar.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+    
+    UserInputService.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement and dragging then
+            update(input)
+        end
+    end)
+    
+    -- Parent to CoreGui
+    self.window.Parent = game:GetService("CoreGui")
+    
+    return self
 end
 
-function library:ToggleUI()
-    if self.UI then
-        self.UI.Enabled = not self.UI.Enabled
+-- Tab Creation
+function XenonUI:AddTab(name, icon)
+    local tab = {
+        name = name,
+        button = Instance.new("TextButton"),
+        content = Instance.new("ScrollingFrame"),
+        elements = {}
+    }
+    
+    -- Tab button
+    tab.button.Name = name
+    tab.button.Size = UDim2.new(0, 100, 0, 30)
+    tab.button.BackgroundColor3 = COLORS.Secondary
+    tab.button.Text = name
+    tab.button.TextColor3 = COLORS.Text
+    tab.button.TextSize = 14
+    tab.button.Font = Enum.Font.Gotham
+    tab.button.Parent = self.content
+    
+    CreateCorner().Parent = tab.button
+    
+    -- Tab content
+    tab.content.Name = name .. "Content"
+    tab.content.Size = UDim2.new(1, 0, 1, 0)
+    tab.content.BackgroundTransparency = 1
+    tab.content.Visible = false
+    tab.content.Parent = self.content
+    
+    -- Layout for tab content
+    local layout = Instance.new("UIListLayout")
+    layout.Padding = UDim.new(0, 5)
+    layout.Parent = tab.content
+    
+    -- Add click handler
+    tab.button.MouseButton1Click:Connect(function()
+        self:SwitchTab(tab)
+    end)
+    
+    table.insert(self.tabs, tab)
+    
+    -- Set as current tab if it's the first one
+    if #self.tabs == 1 then
+        self:SwitchTab(tab)
     end
+    
+    return tab
 end
 
-return library
+-- Tab Switching
+function XenonUI:SwitchTab(tab)
+    if self.currentTab then
+        self.currentTab.content.Visible = false
+        TweenObject(self.currentTab.button, {BackgroundColor3 = COLORS.Secondary}):Play()
+    end
+    
+    self.currentTab = tab
+    tab.content.Visible = true
+    TweenObject(tab.button, {BackgroundColor3 = COLORS.Accent}):Play()
+end
+
+-- Button Creation
+function XenonUI:AddButton(tab, text, callback)
+    local button = Instance.new("TextButton")
+    button.Name = text
+    button.Size = UDim2.new(1, 0, 0, 40)
+    button.BackgroundColor3 = COLORS.Secondary
+    button.Text = text
+    button.TextColor3 = COLORS.Text
+    button.TextSize = 14
+    button.Font = Enum.Font.Gotham
+    button.Parent = tab.content
+    
+    CreateCorner().Parent = button
+    
+    -- Hover effect
+    button.MouseEnter:Connect(function()
+        TweenObject(button, {BackgroundColor3 = COLORS.Hover}):Play()
+    end)
+    
+    button.MouseLeave:Connect(function()
+        TweenObject(button, {BackgroundColor3 = COLORS.Secondary}):Play()
+    end)
+    
+    -- Click effect
+    button.MouseButton1Down:Connect(function()
+        TweenObject(button, {BackgroundColor3 = COLORS.Pressed}):Play()
+    end)
+    
+    button.MouseButton1Up:Connect(function()
+        TweenObject(button, {BackgroundColor3 = COLORS.Hover}):Play()
+        if callback then
+            callback()
+        end
+    end)
+    
+    table.insert(tab.elements, button)
+    return button
+end
+
+-- Toggle Creation
+function XenonUI:AddToggle(tab, text, default, callback)
+    local toggle = {
+        frame = Instance.new("Frame"),
+        label = Instance.new("TextLabel"),
+        button = Instance.new("Frame"),
+        enabled = default or false
+    }
+    
+    toggle.frame.Name = text
+    toggle.frame.Size = UDim2.new(1, 0, 0, 40)
+    toggle.frame.BackgroundColor3 = COLORS.Secondary
+    toggle.frame.Parent = tab.content
+    
+    CreateCorner().Parent = toggle.frame
+    
+    toggle.label.Name = "Label"
+    toggle.label.Size = UDim2.new(1, -50, 1, 0)
+    toggle.label.BackgroundTransparency = 1
+    toggle.label.Text = text
+    toggle.label.TextColor3 = COLORS.Text
+    toggle.label.TextSize = 14
+    toggle.label.Font = Enum.Font.Gotham
+    toggle.label.TextXAlignment = Enum.TextXAlignment.Left
+    toggle.label.Parent = toggle.frame
+    
+    toggle.button.Name = "Toggle"
+    toggle.button.Size = UDim2.new(0, 30, 0, 30)
+    toggle.button.Position = UDim2.new(1, -40, 0.5, -15)
+    toggle.button.BackgroundColor3 = toggle.enabled and COLORS.Accent or COLORS.Secondary
+    toggle.button.Parent = toggle.frame
+    
+    CreateCorner().Parent = toggle.button
+    
+    -- Click handler
+    toggle.frame.MouseButton1Click:Connect(function()
+        toggle.enabled = not toggle.enabled
+        TweenObject(toggle.button, {
+            BackgroundColor3 = toggle.enabled and COLORS.Accent or COLORS.Secondary
+        }):Play()
+        
+        if callback then
+            callback(toggle.enabled)
+        end
+    end)
+    
+    table.insert(tab.elements, toggle)
+    return toggle
+end
+
+-- Slider Creation
+function XenonUI:AddSlider(tab, text, min, max, default, callback)
+    local slider = {
+        frame = Instance.new("Frame"),
+        label = Instance.new("TextLabel"),
+        bar = Instance.new("Frame"),
+        fill = Instance.new("Frame"),
+        value = default or min
+    }
+    
+    slider.frame.Name = text
+    slider.frame.Size = UDim2.new(1, 0, 0, 60)
+    slider.frame.BackgroundColor3 = COLORS.Secondary
+    slider.frame.Parent = tab.content
+    
+    CreateCorner().Parent = slider.frame
+    
+    slider.label.Name = "Label"
+    slider.label.Size = UDim2.new(1, 0, 0, 20)
+    slider.label.BackgroundTransparency = 1
+    slider.label.Text = text
+    slider.label.TextColor3 = COLORS.Text
+    slider.label.TextSize = 14
+    slider.label.Font = Enum.Font.Gotham
+    slider.label.Parent = slider.frame
+    
+    slider.bar.Name = "Bar"
+    slider.bar.Size = UDim2.new(1, -20, 0, 4)
+    slider.bar.Position = UDim2.new(0, 10, 0, 35)
+    slider.bar.BackgroundColor3 = COLORS.Secondary
+    slider.bar.Parent = slider.frame
+    
+    CreateCorner().Parent = slider.bar
+    
+    slider.fill.Name = "Fill"
+    slider.fill.Size = UDim2.new(0, 0, 1, 0)
+    slider.fill.BackgroundColor3 = COLORS.Accent
+    slider.fill.Parent = slider.bar
+    
+    CreateCorner().Parent = slider.fill
+    
+    -- Update fill based on default value
+    local fillSize = (default - min) / (max - min)
+    slider.fill.Size = UDim2.new(fillSize, 0, 1, 0)
+    
+    -- Sliding functionality
+    local sliding = false
+    
+    local function updateSlider(input)
+        local relativeX = math.clamp((input.Position.X - slider.bar.AbsolutePosition.X) / slider.bar.AbsoluteSize.X, 0, 1)
+        local value = min + (max - min) * relativeX
+        slider.value = value
+        
+        slider.fill.Size = UDim2.new(relativeX, 0, 1, 0)
+        
+        if callback then
+            callback(value)
+        end
+    end
+    
+    slider.bar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            sliding = true
+            updateSlider(input)
+        end
+    end)
+    
+    slider.bar.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            sliding = false
+        end
+    end)
+    
+    UserInputService.InputChanged:Connect(function(input)
+        if sliding and input.UserInputType == Enum.UserInputType.MouseMovement then
+            updateSlider(input)
+        end
+    end)
+    
+    table.insert(tab.elements, slider)
+    return slider
+end
+
+-- Dropdown Creation
+function XenonUI:AddDropdown(tab, text, options, callback)
+    local dropdown = {
+        frame = Instance.new("Frame"),
+        label = Instance.new("TextLabel"),
+        button = Instance.new("TextButton"),
+        content = Instance.new("Frame"),
+        options = options,
+        selected = options[1]
+    }
+    
+    dropdown.frame.Name = text
+    dropdown.frame.Size = UDim2.new(1, 0, 0, 40)
+    dropdown.frame.BackgroundColor3 = COLORS.Secondary
+    dropdown.frame.Parent = tab.content
+    
+    CreateCorner().Parent = dropdown.frame
+    
+    dropdown.label.Name = "Label"
+    dropdown.label.Size = UDim2.new(1, -50, 1, 0)
+    dropdown.label.BackgroundTransparency = 1
+    dropdown.label.Text = text
+    dropdown.label.TextColor3 = COLORS.Text
+    dropdown.label.TextSize = 14
+    dropdown.label.Font = Enum.Font.Gotham
+    dropdown.label.TextXAlignment = Enum.TextXAlignment.Left
+    dropdown.label.Parent = dropdown.frame
+    
+    dropdown.button.Name = "Button"
+    dropdown.button.Size = UDim2.new(0, 30, 1, 0)
+    dropdown.button.Position = UDim2.new(1, -40, 0, 0)
+    dropdown.button.BackgroundColor3 = COLORS.Secondary
+    dropdown.button.Text = "▼"
+    dropdown.button.TextColor3 = COLORS.Text
+    dropdown.button.TextSize = 14
+    dropdown.button.Font = Enum.Font.Gotham
+    dropdown.button.Parent = dropdown.frame
+    
+    CreateCorner().Parent = dropdown.button
+    
+    dropdown.content.Name = "Content"
+    dropdown.content.Size = UDim2.new(1, 0, 0, 0)
+    dropdown.content.Position = UDim2.new(0, 0, 1, 5)
+    dropdown.content.BackgroundColor3 = COLORS.Secondary
+    dropdown.content.Visible = false
+    dropdown.content.Parent = dropdown.frame
+    
+    CreateCorner().Parent = dropdown.content
+    
+    -- Create options
+    local layout = Instance.new("UIListLayout")
+    layout.Padding = UDim.new(0, 2)
+    layout.Parent = dropdown.content
+    
+    for _, option in ipairs(options) do
+        local optionButton = Instance.new("TextButton")
+        optionButton.Size = UDim2.new(1, 0, 0, 30)
+        optionButton.BackgroundColor3 = COLORS.Secondary
+        optionButton.Text = option
+        optionButton.TextColor3 = COLORS.Text
+        optionButton.TextSize = 14
+        optionButton.Font = Enum.Font.Gotham
+        optionButton.Parent = dropdown.content
+        
+        CreateCorner().Parent = optionButton
+        
+        optionButton.MouseButton1Click:Connect(function()
+            dropdown.selected = option
+            dropdown.button.Text = option
+            dropdown.content.Visible = false
+            
+            if callback then
+                callback(option)
+            end
+        end)
+    end
+    
+    -- Toggle dropdown
+    dropdown.button.MouseButton1Click:Connect(function()
+        dropdown.content.Visible = not dropdown.content.Visible
+        dropdown.button.Text = dropdown.content.Visible and "▲" or "▼"
+    end)
+    
+    table.insert(tab.elements, dropdown)
+    return dropdown
+end
+
+-- Close Window
+function XenonUI:Close()
+    TweenObject(self.mainFrame, {
+        Size = UDim2.new(0, 0, 0, 0),
+        Position = UDim2.new(0.5, 0, 0.5, 0)
+    }, 0.2):Play()
+    
+    wait(0.2)
+    self.window:Destroy()
+end
+
+return XenonUI 
